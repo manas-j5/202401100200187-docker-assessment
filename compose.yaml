@@ -24,6 +24,7 @@ services:
       DB_USER: festpass
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       REGNO: ${REGNO}
+      APP_VERSION: 1.0.0
     depends_on:
       db:
         condition: service_healthy

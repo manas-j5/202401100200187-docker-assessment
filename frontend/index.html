@@ -3,22 +3,214 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>FestPass</title>
+    <title>FestPass 2026</title>
+    <style>
+      :root {
+        color: #172033;
+        font-family: Arial, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        padding: 28px 32px;
+      }
+
+      main {
+        max-width: 760px;
+      }
+
+      h1 {
+        margin: 0 0 24px;
+        font-size: 32px;
+      }
+
+      h2 {
+        margin: 26px 0 22px;
+        font-size: 24px;
+      }
+
+      p {
+        color: #374151;
+        font-size: 16px;
+        margin: 0 0 20px;
+      }
+
+      .status-card,
+      .submitted-card {
+        background: #f1f5f9;
+        border-left: 4px solid #2d5bd1;
+        margin: 18px 0 24px;
+        max-width: 480px;
+        padding: 14px 16px;
+      }
+
+      .status-card p,
+      .submitted-card p {
+        margin: 7px 0;
+      }
+
+      .success {
+        color: #166534;
+      }
+
+      .error {
+        color: #b91c1c;
+      }
+
+      strong {
+        color: #334155;
+      }
+
+      form {
+        max-width: 480px;
+      }
+
+      label {
+        display: block;
+        margin: 0 0 7px;
+      }
+
+      input {
+        box-sizing: border-box;
+        display: block;
+        font: inherit;
+        margin: 0 0 18px;
+        padding: 11px;
+        width: 100%;
+      }
+
+      button {
+        background: #2d5bd1;
+        border: 0;
+        border-radius: 6px;
+        color: white;
+        cursor: pointer;
+        font: inherit;
+        padding: 12px;
+        width: 100%;
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.7;
+      }
+
+      #message {
+        min-height: 20px;
+        margin-top: 20px;
+      }
+
+      #registrations {
+        padding-left: 22px;
+      }
+
+      #registrations li {
+        margin-bottom: 12px;
+      }
+    </style>
   </head>
   <body>
     <main>
-      <h1>FestPass</h1>
-      <p>Minimal assessment implementation. Backend health: <span id="health">checking...</span></p>
+      <h1>FestPass 2026</h1>
+      <p>Registration number: <strong id="regno">loading...</strong></p>
+      <p>Application version: <strong id="version">loading...</strong></p>
+      <section class="status-card" aria-live="polite">
+        <p><strong>Backend health verification</strong></p>
+        <p>Status: <strong id="health-status">Checking...</strong></p>
+        <p>Database: <strong id="database">Checking...</strong></p>
+        <p>API version: <strong id="version">Checking...</strong></p>
+        <p>Registration number: <strong id="regno">Checking...</strong></p>
+      </section>
+
+      <h2>Register for the festival</h2>
+      <form id="registration-form">
+        <label for="name">Name</label>
+        <input id="name" name="name" required>
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" required>
+        <button id="submit-button" type="submit">Create registration</button>
+      </form>
+      <p id="message" role="status"></p>
+      <section id="submitted-card" class="submitted-card" hidden aria-live="polite">
+        <p><strong>Submitted input verified</strong></p>
+        <p>Name: <strong id="submitted-name"></strong></p>
+        <p>Email: <strong id="submitted-email"></strong></p>
+        <p>Registration ID: <strong id="submitted-id"></strong></p>
+      </section>
+
+      <h2>Registrations</h2>
+      <ul id="registrations"></ul>
     </main>
     <script>
-      fetch('/api/health')
-        .then(response => response.json())
-        .then(data => {
-          document.getElementById('health').textContent = data.status;
-        })
-        .catch(() => {
-          document.getElementById('health').textContent = 'unavailable';
+      const form = document.getElementById('registration-form');
+      const message = document.getElementById('message');
+      const registrations = document.getElementById('registrations');
+
+      function renderRegistrations(items) {
+        registrations.replaceChildren();
+        items.forEach(item => {
+          const entry = document.createElement('li');
+          entry.textContent = `${item.name} — ${item.email}`;
+          registrations.appendChild(entry);
         });
+      }
+
+      async function loadApplication() {
+        const healthResponse = await fetch('/api/health');
+        const health = await healthResponse.json();
+        document.getElementById('health-status').textContent = health.status === 'ok' ? 'Healthy' : health.status;
+        document.getElementById('database').textContent = health.database ? 'Connected' : 'Disconnected';
+        document.getElementById('version').textContent = health.version;
+        document.getElementById('regno').textContent = health.regno || 'Not configured';
+
+        const registrationsResponse = await fetch('/api/registrations');
+        const items = await registrationsResponse.json();
+        if (!registrationsResponse.ok || !Array.isArray(items)) {
+          throw new Error(items.error || 'Unable to load registrations');
+        }
+        renderRegistrations(items);
+      }
+
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const button = document.getElementById('submit-button');
+        button.disabled = true;
+        message.textContent = '';
+        try {
+          const response = await fetch('/api/registrations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: document.getElementById('name').value,
+              email: document.getElementById('email').value
+            })
+          });
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(result.error || 'Registration failed');
+          }
+          form.reset();
+          message.className = 'success';
+          message.textContent = 'Registration submitted and verified by the backend.';
+          document.getElementById('submitted-name').textContent = result.name;
+          document.getElementById('submitted-email').textContent = result.email;
+          document.getElementById('submitted-id').textContent = result.id;
+          document.getElementById('submitted-card').hidden = false;
+          await loadApplication();
+        } catch (error) {
+          message.className = 'error';
+          message.textContent = error.message;
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      loadApplication().catch(error => {
+        document.getElementById('health-status').textContent = 'Unavailable';
+        message.textContent = error.message;
+        message.className = 'error';
+        document.getElementById('database').textContent = 'Unavailable';
+      });
     </script>
   </body>
 </html>
