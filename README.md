@@ -73,10 +73,23 @@ required before claiming a passing gate.
 
 ## Stages 4 and 5 status
 
-Docker Hub publication and Cosign signing were not performed. The Docker Hub
-login/push requires an interactive credential and explicit authorization, and
-the Cosign executable is not installed. No registry digest, signature, or
-verification result is claimed.
+The local release image was built and tagged as
+`msmanas/fest-backend:1.0.0` and `msmanas/fest-backend:1.0`. Docker Hub
+publication was not performed because the Docker Hub login/push requires an
+interactive credential and explicit authorization. No registry digest is
+claimed.
+
+Cosign signing was not performed because the Cosign executable is not
+installed. No key pair, signature, or verification result is claimed. After
+installing Cosign from its official release, the required commands are:
+
+```powershell
+cosign generate-key-pair
+cosign sign --key cosign.key msmanas/fest-backend@sha256:<actual-registry-digest>
+cosign verify --key cosign.pub msmanas/fest-backend@sha256:<actual-registry-digest>
+```
+
+The private `cosign.key` must remain ignored and must never be committed.
 
 ## Evidence
 
